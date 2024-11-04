@@ -7,20 +7,29 @@ async function scrapePage(url) {
     const $ = cheerio.load(data);
 
     // Seleciona o conteúdo principal da página
-    const contentDiv = $('#mw-content-text .mw-parser-output');
+    const conteudoPrincipal = $('.artdeco-card');
+    const headline = []
 
-    // Extrai os primeiros parágrafos de texto dentro do conteúdo principal
-    let info = '';
-    contentDiv.find('p').each((index, element) => {
-      const paragraph = $(element).text().trim();
-      if (paragraph) {
-        info += paragraph + '\n';
-        if (index >= 1) return false;
-      }
+    conteudoPrincipal.each(function () { 
+      const banner = $(this).find('.profile-background-image__image > img').attr('src')?.trim() || 'Banner não identificado';
+      const imagemPerfil = $(this).find('.pv-top-card-profile-picture__image > img').attr('src')?.trim() || 'Imagem não identificada';
+      const titulo = $(this).find('.RIbnCAsTbWzbdDScQkPGXRrQHSaITKZWQhh').text().trim();
+      const informacao = $(this).find('.text-body-medium').text().trim();
+      const emailContato = $(this).find('sgHBedUcYdJyoeEZQSGfeDThoFFLbJpMLqaRAUU > a').attr('href')?.trim() || "Contato não encontrado";
+
+      if (banner && imagemPerfil && titulo && informacao && emailContato) {
+        headline.push({
+            banner,
+            imagemPerfil,
+            titulo,
+            informacao,
+            emailContato
+        });
+    }
     });
 
-    console.log(info);
-    return info;
+    console.log(headline);
+    return headline;
 
   } catch (error) {
     console.error('Erro ao realizar scraping:', error);

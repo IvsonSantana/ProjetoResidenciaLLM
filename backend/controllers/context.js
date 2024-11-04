@@ -1,8 +1,17 @@
 const axios = require('axios');
 require('dotenv').config();
 
-async function getContextualizedInfo(info) {
-  const prompt = `Dado o seguinte conteúdo: "${info}", forneça um resumo em português.`;
+
+async function getContextualizedInfo(headline) {
+  const prompt = `De acordo com os dados passados da headline do usuario do linkedin aponte melhorias, :
+  
+  Foto de perfil: ${headline.imagemPerfil ? 'Presente' : 'Ausente'}
+  Informação: ${headline.informacao || 'Não fornecida'}
+  Banner: ${headline.banner ? 'Presente' : 'Ausente'}
+  Título: ${headline.titulo || 'Não fornecido'}
+  Contato por email: ${headline.emailContato || 'Não encontrado'}
+  
+  Se algum dado estiver ausente, recomende ao usuário como melhorar seu perfil.`;
 
   try {
     const response = await axios.post(
@@ -10,7 +19,7 @@ async function getContextualizedInfo(info) {
       {
         model: "gpt-3.5-turbo",
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 100,
+        max_tokens: 150,
         temperature: 0.7
       },
       {
@@ -33,4 +42,4 @@ async function getContextualizedInfo(info) {
   }
 }
 
-module.exports = { getContextualizedInfo };
+module.exports = { getContextualizedInfo };     
