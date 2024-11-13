@@ -4,6 +4,7 @@ const cors = require('cors')
 const helmet = require('helmet');
 const dotenv = require('dotenv');
 const connectDB = require('./config/database');
+const contextoRoutes = require ('./routes/contextoMelhoriaRoutes')
 
 dotenv.config();
 
@@ -20,6 +21,8 @@ app.use(morgan('dev'));
 app.use(express.json());
 
 app.use(express.urlencoded({ extended: true }));
+
+app.use('/api', contextoRoutes);
 
 
 const PORT = process.env.PORT || 3000;
