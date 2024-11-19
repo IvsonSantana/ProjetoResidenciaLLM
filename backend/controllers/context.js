@@ -1,17 +1,13 @@
 const axios = require('axios');
 require('dotenv').config();
 
-
-async function getContextualizedInfo(headline) {
-  const prompt = `De acordo com os dados passados da headline do usuário do LinkedIn, aponte melhorias:
-
-  Foto de perfil: ${headline.imagemPerfil ? 'Presente' : 'Ausente'}
-  Informação: ${headline.informacao || 'Não fornecida'}
-  Banner: ${headline.banner ? 'Presente' : 'Ausente'}
-  Título: ${headline.titulo || 'Não fornecido'}
-  Contato por email: ${headline.emailContato || 'Não encontrado'}
-
-  Se algum dado estiver ausente, recomende ao usuário como melhorar seu perfil.`;
+/**
+ * Função para obter informações contextualizadas do texto extraído usando a LLM.
+ * @param {string} pdfText - Texto extraído do PDF.
+ * @returns {object} - Sugestões ou insights fornecidos pela LLM.
+ */
+async function getContextualizedInfo(pdfText) {
+  const prompt = `Baseado no texto extraído do PDF, forneça insights ou sugestões. Texto do PDF:\n\n${pdfText}\n\n`;
 
   try {
     const response = await axios.post(
@@ -40,7 +36,6 @@ async function getContextualizedInfo(headline) {
     }
   } catch (error) {
     console.error("Erro ao buscar contexto com OpenAI:", error.message);
-    console.log("Resposta completa:", error.response?.data || error);
     return {
       success: false,
       error: "Erro ao buscar contexto adicional."
@@ -49,4 +44,3 @@ async function getContextualizedInfo(headline) {
 }
 
 module.exports = { getContextualizedInfo };
- 

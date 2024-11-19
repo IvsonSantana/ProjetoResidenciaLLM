@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const contextoController = require('../controllers/contextualmelhoria');
+const contextoMelhoriaController = require('../controllers/contextualmelhoria');  // Corrija o caminho se necessário
 
-router.get('/context', contextoController.getContextoMelhoria);
+// Rota para processar o PDF e obter informações contextualizadas
+router.post('/contexto', contextoMelhoriaController.getContextoMelhoria);
 
 module.exports = router;
