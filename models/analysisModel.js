@@ -1,7 +1,4 @@
-// models/analysisModel.js
 const mongoose = require('mongoose');
-
-// Definindo o Schema para a Análise
 const analysisSchema = new mongoose.Schema({
   pdfText: {
     type: String,
@@ -12,8 +9,7 @@ const analysisSchema = new mongoose.Schema({
     required: true,
   },
 }, {
-  timestamps: true,  // Cria campos `createdAt` e `updatedAt` automaticamente
+  timestamps: true, 
 });
 
-// Criando e exportando o modelo Analysis
 module.exports = mongoose.model('Analysis', analysisSchema);

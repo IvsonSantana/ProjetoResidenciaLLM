@@ -1,4 +1,3 @@
-// controllers/analysisController.js
 const fs = require('fs');
 const pdfParse = require('pdf-parse');
 const axios = require('axios');
@@ -6,17 +5,49 @@ const mongoose = require('mongoose');
 const Analysis = require('../models/analysisModel');
 require('dotenv').config();
 
-// Função para extrair texto do PDF e gerar uma sugestão via LLM
+
 async function getLLMAnalysis(pdfText) {
-  const prompt = `Baseado no texto extraído do PDF, forneça insights ou sugestões. Texto do PDF:\n\n${pdfText}`;
+  const initialPrompt = `O texto a seguir foi extraído de um PDF. Verifique se ele corresponde a um currículo. Se for um currículo, responda "true". Caso contrário, responda "false". Texto do PDF:\n\n${pdfText}`;
 
   try {
-    const response = await axios.post(
+    const identificationResponse = await axios.post(
       'https://api.openai.com/v1/chat/completions',
       {
         model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 500,
+        messages: [{ role: "user", content: initialPrompt }],
+        max_tokens: 50,
+        temperature: 0.3,
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const isResume = identificationResponse.data.choices[0].message.content.trim().toLowerCase() === 'true';
+
+    if (!isResume) {
+      return 'O PDF enviado não parece ser um currículo. Por favor, envie um currículo para análise.';
+    }
+
+    const analysisPrompt = `Você é um assistente especializado em análise de currículos. Analise o texto do currículo fornecido e produza uma análise detalhada abordando os seguintes aspectos:
+    - Clareza e organização geral do currículo.
+    - Coerência das informações apresentadas.
+    - Qualidade da formatação e apresentação.
+    - Pontos fortes e habilidades destacadas.
+    - Áreas que podem ser melhoradas ou adicionadas.
+    - Sugestões para tornar o currículo mais atrativo. 
+    
+    Texto do currículo:\n\n${pdfText}`;
+
+    const analysisResponse = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "user", content: analysisPrompt }],
+        max_tokens: 1000,
         temperature: 0.7,
       },
       {
@@ -27,48 +58,28 @@ async function getLLMAnalysis(pdfText) {
       }
     );
 
-    if (response.data && response.data.choices && response.data.choices[0]) {
-      return response.data.choices[0].message.content.trim();
+    if (analysisResponse.data && analysisResponse.data.choices && analysisResponse.data.choices[0]) {
+      return analysisResponse.data.choices[0].message.content.trim();
     } else {
-      throw new Error('Resposta inesperada da API');
+      throw new Error('Resposta inesperada da API durante a análise do currículo.');
     }
   } catch (error) {
-    console.error('Erro ao enviar texto para a LLM:', error.message);
-    throw new Error('Erro ao processar o texto com a LLM');
+    console.error('Erro ao processar o PDF:', error.message);
+    throw new Error('Erro ao analisar o PDF.');
   }
 }
-
-// Função para criar (analisar) um PDF e salvar no banco de dados
-exports.createAnalysis = async (req, res) => {
+exports.analyzePDF = async (req, res) => {
   try {
     const filePath = req.file.path;
-
-    // Extrair texto do PDF
     const pdfBuffer = fs.readFileSync(filePath);
     const data = await pdfParse(pdfBuffer);
     const pdfText = data.text;
-
-    // Obter sugestão via LLM
     const suggestion = await getLLMAnalysis(pdfText);
-
-    // Salvar análise no banco de dados
-    const newAnalysis = new Analysis({
+    fs.unlinkSync(filePath);
+    res.status(200).json({
+      success: true,
       pdfText,
       suggestion,
-    });
-
-    await newAnalysis.save();
-
-    console.log('Nova Análise Criada:', newAnalysis);
-
-    // Remover o arquivo temporário após o processamento
-    fs.unlinkSync(filePath);
-
-    res.status(201).json({
-      success: true,
-      message: 'Análise criada com sucesso!',
-      analysisId: newAnalysis._id,
-      suggestion: newAnalysis.suggestion,  // Retorna a sugestão na resposta
     });
   } catch (error) {
     console.error('Erro ao processar o PDF:', error);
@@ -76,13 +87,30 @@ exports.createAnalysis = async (req, res) => {
   }
 };
 
+exports.saveAnalysis = async (req, res) => {
+  try {
+    const { suggestion } = req.body;
 
-// Função para obter uma análise por ID
+    const newAnalysis = new Analysis({
+      suggestion,
+    });
+
+    await newAnalysis.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Análise salva com sucesso!',
+      analysisId: newAnalysis._id,
+    });
+  } catch (error) {
+    console.error('Erro ao salvar análise:', error);
+    res.status(500).json({ success: false, error: 'Erro ao salvar a análise.' });
+  }
+};
+
 exports.getAnalysisById = async (req, res) => {
   try {
     const analysisId = req.params.id;
-
-    // Verifica se o ID está no formato correto
     if (!mongoose.Types.ObjectId.isValid(analysisId)) {
       return res.status(400).json({ success: false, error: 'ID inválido.' });
     }
@@ -95,8 +123,8 @@ exports.getAnalysisById = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      suggestion: analysis.suggestion, // Retorna apenas a sugestão
-      pdfText: analysis.pdfText, // Se você quiser também retornar o texto do PDF
+      suggestion: analysis.suggestion, 
+      pdfText: analysis.pdfText, 
     });
   } catch (error) {
     console.error('Erro ao buscar análise:', error);
@@ -107,9 +135,7 @@ exports.getAnalysisById = async (req, res) => {
 
 exports.getLastAnalysisWithCheck = async (req, res) => {
   try {
-    // Buscar a última análise, ordenada pela data de criação
     const lastAnalysis = await Analysis.findOne().sort({ createdAt: -1 });
-
     if (!lastAnalysis) {
       return res.status(404).json({ 
         success: false, 
@@ -130,8 +156,6 @@ exports.getLastAnalysisWithCheck = async (req, res) => {
   }
 };
 
-
-// Função para listar todas as análises
 exports.getAllAnalyses = async (req, res) => {
   try {
     const analyses = await Analysis.find().sort({ createdAt: -1 });
@@ -142,8 +166,6 @@ exports.getAllAnalyses = async (req, res) => {
   }
 };
 
-
-// Função para atualizar uma análise por ID
 exports.updateAnalysis = async (req, res) => {
   try {
     const { suggestion } = req.body;
@@ -151,7 +173,7 @@ exports.updateAnalysis = async (req, res) => {
     const updatedAnalysis = await Analysis.findByIdAndUpdate(
       req.params.id,
       { suggestion },
-      { new: true } // Retorna o documento atualizado
+      { new: true } 
     );
 
     if (!updatedAnalysis) {
@@ -169,7 +191,6 @@ exports.updateAnalysis = async (req, res) => {
   }
 };
 
-// Função para excluir uma análise por ID
 exports.deleteAnalysis = async (req, res) => {
   try {
     const deletedAnalysis = await Analysis.findByIdAndDelete(req.params.id);
@@ -186,4 +207,4 @@ exports.deleteAnalysis = async (req, res) => {
     console.error('Erro ao excluir análise:', error);
     res.status(500).json({ success: false, error: 'Erro ao excluir a análise.' });
   }
-};
+};  
