@@ -1,8 +1,7 @@
 const mongoose = require('mongoose');
 const analysisSchema = new mongoose.Schema({
   pdfText: {
-    type: String,
-    required: true,
+    type: String
   },
   suggestion: {
     type: String,
